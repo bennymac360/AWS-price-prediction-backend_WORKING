@@ -57,7 +57,7 @@ const predictionSchema = new mongoose.Schema({
 
 const Prediction = mongoose.model('Prediction', predictionSchema);
 
-// Define networks configuration
+// Define networks configuration with 'enabled' flag
 const networks = {
   '0xe': {
     chainName: 'Flare',
@@ -67,42 +67,39 @@ const networks = {
     paymentAmount: '5',
     rpcUrl: 'https://flare-api.flare.network/ext/C/rpc',
     blockExplorerUrl: 'https://flare-explorer.flare.network',
-  },
-  '0x1': {
-    chainName: 'Ethereum',
-    symbol: 'ETH',
-    decimals: 18,
-    contractAddress: '0xYourEthereumContractAddress',
-    paymentAmount: '0.0002',
-    rpcUrl: 'https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID', // Replace with your Infura project ID
-    blockExplorerUrl: 'https://etherscan.io',
-  },
-  '0xa86a': {
-    chainName: 'Avalanche',
-    symbol: 'AVAX',
-    decimals: 18,
-    contractAddress: '0xYourAvalancheContractAddress',
-    paymentAmount: '0.005',
-    rpcUrl: 'https://api.avax.network/ext/bc/C/rpc',
-    blockExplorerUrl: 'https://snowtrace.io',
+    enabled: true, // Network is enabled
   },
   '0x13': {
     chainName: 'Songbird',
     symbol: 'SGB',
     decimals: 18,
     contractAddress: '0xe6222145426C1C47dA910C22cd08aC72E0228Da6',
-    rpcUrl: 'https://songbird-api.flare.network/ext/C/rpc',
     paymentAmount: '10',
+    rpcUrl: 'https://songbird-api.flare.network/ext/C/rpc',
+    blockExplorerUrl: 'https://songbird-explorer.flare.network',
+    enabled: true, // Network is enabled
   },
-  '0x89':{
-    chainName: 'Polygon',
-    symbol: 'MATIC',
+  '0x1': {
+    chainName: 'Ethereum',
+    symbol: 'ETH',
     decimals: 18,
-    contractAddress: '0xYourPolygonContractAddress',
-    paymentAmount: '0.5',
-    rpcUrl: 'https://polygon-rpc.com',
-    blockExplorerUrl: 'https://polygonscan.com',
+    contractAddress: '0xfBe49bFF9187af5821091821699Be327bE05Ce9B',
+    paymentAmount: '0.0004',
+    rpcUrl: 'https://ethereum-rpc.publicnode.com',
+    blockExplorerUrl: 'https://etherscan.io',
+    enabled: false, // Network is disabled
   },
+  '0xa86a': {
+    chainName: 'Avalanche',
+    symbol: 'AVAX',
+    decimals: 18,
+    contractAddress: '0x87aa60EA60Ed960deD99D41fd88A99F9d1F810EA',
+    paymentAmount: '0.005',
+    rpcUrl: 'https://api.avax.network/ext/bc/C/rpc',
+    blockExplorerUrl: 'https://snowtrace.io',
+    enabled: false, // Network is disabled
+  },
+  // Add other networks as needed, ensuring the 'enabled' flag is set appropriately
 };
 
 // Contract ABI remains the same
@@ -188,8 +185,8 @@ app.post('/api/request-prediction', async (req, res) => {
 
   // Validate chainId and get network configuration
   const network = networks[chainId.toLowerCase()];
-  if (!network) {
-    return res.status(400).json({ error: 'Unsupported network' });
+  if (!network || !network.enabled) {
+    return res.status(400).json({ error: 'Unsupported or disabled network' });
   }
 
   try {
@@ -234,7 +231,7 @@ async function verifyTransaction(
   contractAddress,
   expectedAmount,
   decimals
-){
+) {
   try {
     const tx = await provider.getTransaction(transactionHash);
 
@@ -266,6 +263,7 @@ async function verifyTransaction(
 
     const receipt = await provider.getTransactionReceipt(transactionHash);
     if (receipt && receipt.confirmations >= 1) {
+      console.log('Transaction verified successfully');
       return true;
     } else {
       console.error('Transaction not yet confirmed');
