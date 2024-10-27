@@ -57,58 +57,84 @@ const predictionSchema = new mongoose.Schema({
 
 const Prediction = mongoose.model('Prediction', predictionSchema);
 
-// Define networks configuration with 'enabled' flag
+// Define networks configuration with 'enabled' flag and PORO token details
 const networks = {
   '0xe': {
     chainName: 'Flare',
     symbol: 'FLR',
     decimals: 18,
-    contractAddress: '0xfBe49bFF9187af5821091821699Be327bE05Ce9B',
+    contractAddress: '0x9252daC7C660a333ac35190b58b86758c965C715', // Replace with your Flare contract address
     paymentAmount: '5',
     rpcUrl: 'https://flare-api.flare.network/ext/C/rpc',
     blockExplorerUrl: 'https://flare-explorer.flare.network',
-    enabled: true, // Network is enabled
+    enabled: true,
+    poroTokenAddress: '0xBB12324722a3dd74Cc1Bbc36445a170Aa1423E22', // Replace with your PORO token address on Flare
+    poroTokenDecimals: 18,
   },
   '0x13': {
     chainName: 'Songbird',
     symbol: 'SGB',
     decimals: 18,
-    contractAddress: '0xe6222145426C1C47dA910C22cd08aC72E0228Da6',
+    contractAddress: 'YOUR_SONGBIRD_CONTRACT_ADDRESS', // Replace with your Songbird contract address
     paymentAmount: '10',
     rpcUrl: 'https://songbird-api.flare.network/ext/C/rpc',
     blockExplorerUrl: 'https://songbird-explorer.flare.network',
-    enabled: true, // Network is enabled
+    enabled: false,
+    poroTokenAddress: 'YOUR_PORO_TOKEN_ADDRESS_ON_SONGBIRD', // Replace with your PORO token address on Songbird
+    poroTokenDecimals: 18,
+  },
+  '0x72': {
+    chainName: 'Coston2',
+    symbol: 'C2FLR',
+    decimals: 18,
+    contractAddress: '0xEcd0fAbb2825814B480156a8886fBE21D2245d97', // Replace with your Coston2 contract address
+    paymentAmount: '5',
+    rpcUrl: 'https://coston2-api.flare.network/ext/C/rpc',
+    blockExplorerUrl: 'https://coston2-explorer.flare.network',
+    enabled: false,
+    poroTokenAddress: '0x469dd82993185fb3274c1A53E517ff29454f8a6e', // Replace with your PORO token address on Coston2
+    poroTokenDecimals: 18,
   },
   '0x1': {
     chainName: 'Ethereum',
     symbol: 'ETH',
     decimals: 18,
-    contractAddress: '0xfBe49bFF9187af5821091821699Be327bE05Ce9B',
+    contractAddress: 'YOUR_ETHEREUM_CONTRACT_ADDRESS', // Replace with your Ethereum contract address if applicable
     paymentAmount: '0.0004',
     rpcUrl: 'https://ethereum-rpc.publicnode.com',
     blockExplorerUrl: 'https://etherscan.io',
-    enabled: false, // Network is disabled
+    enabled: false,
+    poroTokenAddress: '',
+    poroTokenDecimals: 18,
   },
   '0xa86a': {
     chainName: 'Avalanche',
     symbol: 'AVAX',
     decimals: 18,
-    contractAddress: '0x87aa60EA60Ed960deD99D41fd88A99F9d1F810EA',
+    contractAddress: 'YOUR_AVALANCHE_CONTRACT_ADDRESS', // Replace with your Avalanche contract address if applicable
     paymentAmount: '0.005',
     rpcUrl: 'https://api.avax.network/ext/bc/C/rpc',
     blockExplorerUrl: 'https://snowtrace.io',
-    enabled: false, // Network is disabled
+    enabled: false,
+    poroTokenAddress: '',
+    poroTokenDecimals: 18,
   },
-  // Add other networks as needed, ensuring the 'enabled' flag is set appropriately
 };
 
-// Contract ABI remains the same
+// Contract ABI for the updated PricePrediction contract
 const contractABI = [
   {
     inputs: [],
-    name: 'makePayment',
+    name: 'makePaymentInFLR',
     outputs: [],
     stateMutability: 'payable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'makePaymentInPORO',
+    outputs: [],
+    stateMutability: 'nonpayable',
     type: 'function',
   },
   {
@@ -130,6 +156,12 @@ const contractABI = [
         internalType: 'uint256',
         name: 'amount',
         type: 'uint256',
+      },
+      {
+        indexed: false,
+        internalType: 'string',
+        name: 'paymentMethod',
+        type: 'string',
       },
     ],
     name: 'PaymentReceived',
@@ -157,20 +189,26 @@ const contractABI = [
   },
 ];
 
-// Endpoint to receive coinId, model, transactionHash, walletAddress, and chainId
+// Endpoint to receive coinId, model, transactionHash, walletAddress, chainId, and paymentMethod
 app.post('/api/request-prediction', async (req, res) => {
-  const { coinId, model, transactionHash, walletAddress, chainId } = req.body;
+  const {
+    coinId,
+    model,
+    transactionHash,
+    walletAddress,
+    chainId,
+    paymentMethod,
+  } = req.body;
 
   if (
     coinId === undefined ||
     model === undefined ||
     transactionHash === undefined ||
     walletAddress === undefined ||
-    chainId === undefined
+    chainId === undefined ||
+    paymentMethod === undefined
   ) {
-    return res
-      .status(400)
-      .json({ error: 'Missing coinId, model, transactionHash, walletAddress, or chainId' });
+    return res.status(400).json({ error: 'Missing required parameters' });
   }
 
   // Validate wallet address format
@@ -181,6 +219,11 @@ app.post('/api/request-prediction', async (req, res) => {
   // Validate model
   if (![0, 1].includes(model)) {
     return res.status(400).json({ error: 'Invalid model selection' });
+  }
+
+  // Validate paymentMethod
+  if (!['FLR', 'PORO'].includes(paymentMethod)) {
+    return res.status(400).json({ error: 'Invalid payment method' });
   }
 
   // Validate chainId and get network configuration
@@ -203,7 +246,10 @@ app.post('/api/request-prediction', async (req, res) => {
       provider,
       network.contractAddress,
       network.paymentAmount,
-      network.decimals
+      network.decimals,
+      paymentMethod,
+      network.poroTokenAddress,
+      network.poroTokenDecimals
     );
 
     if (!isValid) {
@@ -230,7 +276,10 @@ async function verifyTransaction(
   provider,
   contractAddress,
   expectedAmount,
-  decimals
+  decimals,
+  paymentMethod,
+  poroTokenAddress,
+  poroTokenDecimals
 ) {
   try {
     const tx = await provider.getTransaction(transactionHash);
@@ -240,35 +289,66 @@ async function verifyTransaction(
       return false;
     }
 
-    if (tx.to.toLowerCase() !== contractAddress.toLowerCase()) {
-      console.error(`Transaction was sent to ${tx.to}, expected ${contractAddress}`);
-      return false;
-    }
-
     if (tx.from.toLowerCase() !== walletAddress.toLowerCase()) {
       console.error(`Transaction was sent from ${tx.from}, expected ${walletAddress}`);
       return false;
     }
 
-    // Parse expected amount into a BigNumber
-    const expectedAmountBN = ethers.utils.parseUnits(expectedAmount.toString(), decimals);
-
-    // Compare BigNumbers
-    if (!tx.value.eq(expectedAmountBN)) {
-      console.error(
-        `Incorrect transaction amount: expected ${expectedAmountBN.toString()}, got ${tx.value.toString()}`
-      );
-      return false;
-    }
-
     const receipt = await provider.getTransactionReceipt(transactionHash);
-    if (receipt && receipt.confirmations >= 1) {
-      console.log('Transaction verified successfully');
-      return true;
-    } else {
+    if (!receipt || receipt.confirmations < 1) {
       console.error('Transaction not yet confirmed');
       return false;
     }
+
+    if (paymentMethod === 'FLR') {
+      if (tx.to.toLowerCase() !== contractAddress.toLowerCase()) {
+        console.error(`Transaction was sent to ${tx.to}, expected ${contractAddress}`);
+        return false;
+      }
+
+      // Parse expected amount into a BigNumber
+      const expectedAmountBN = ethers.utils.parseUnits(expectedAmount.toString(), decimals);
+
+      // Compare BigNumbers
+      if (!tx.value.eq(expectedAmountBN)) {
+        console.error(
+          `Incorrect transaction amount: expected ${expectedAmountBN.toString()}, got ${tx.value.toString()}`
+        );
+        return false;
+      }
+
+      // Check if the method called is makePaymentInFLR
+      const iface = new ethers.utils.Interface(contractABI);
+      const decodedData = iface.parseTransaction({ data: tx.data });
+
+      if (decodedData.name !== 'makePaymentInFLR') {
+        console.error('Transaction is not a call to makePaymentInFLR');
+        return false;
+      }
+    } else if (paymentMethod === 'PORO') {
+      // Check if the transaction is a contract interaction with makePaymentInPORO
+      if (tx.to.toLowerCase() !== contractAddress.toLowerCase()) {
+        console.error(`Transaction was sent to ${tx.to}, expected ${contractAddress}`);
+        return false;
+      }
+
+      // Parse the transaction input data
+      const iface = new ethers.utils.Interface(contractABI);
+      const decodedData = iface.parseTransaction({ data: tx.data });
+
+      if (decodedData.name !== 'makePaymentInPORO') {
+        console.error('Transaction is not a call to makePaymentInPORO');
+        return false;
+      }
+
+      // Optionally, verify that the PORO tokens were transferred to the contract
+      // This can be complex and may require additional logic, such as checking the events
+      // emitted by the PORO token contract. For simplicity, we're assuming the transaction
+      // is valid if it successfully calls makePaymentInPORO.
+    }
+
+    console.log('Transaction verified successfully');
+    return true;
   } catch (error) {
     console.error('Error verifying transaction:', error);
     return false;
