@@ -57,19 +57,19 @@ const predictionSchema = new mongoose.Schema({
 
 const Prediction = mongoose.model('Prediction', predictionSchema);
 
-// Define networks configuration with 'enabled' flag and PORO token details
+// Define networks configuration with 'enabled' flag and PYRO token details
 const networks = {
   '0xe': {
     chainName: 'Flare',
     symbol: 'FLR',
     decimals: 18,
-    contractAddress: '0x9252daC7C660a333ac35190b58b86758c965C715', // Replace with your Flare contract address
+    contractAddress: '0xd5FF131A4e1c30c2559893aC4B140727BE98e5bB', // Replace with your Flare contract address
     paymentAmount: '5',
     rpcUrl: 'https://flare-api.flare.network/ext/C/rpc',
     blockExplorerUrl: 'https://flare-explorer.flare.network',
     enabled: true,
-    poroTokenAddress: '0xBB12324722a3dd74Cc1Bbc36445a170Aa1423E22', // Replace with your PORO token address on Flare
-    poroTokenDecimals: 18,
+    pyroTokenAddress: '0x2eADcE98B55D0e2895ec90c4adEB6994E4b2b768', // Replace with your PYRO token address on Flare
+    pyroTokenDecimals: 18,
   },
   '0x13': {
     chainName: 'Songbird',
@@ -80,8 +80,8 @@ const networks = {
     rpcUrl: 'https://songbird-api.flare.network/ext/C/rpc',
     blockExplorerUrl: 'https://songbird-explorer.flare.network',
     enabled: false,
-    poroTokenAddress: 'YOUR_PORO_TOKEN_ADDRESS_ON_SONGBIRD', // Replace with your PORO token address on Songbird
-    poroTokenDecimals: 18,
+    pyroTokenAddress: 'YOUR_PYRO_TOKEN_ADDRESS_ON_SONGBIRD', // Replace with your PYRO token address on Songbird
+    pyroTokenDecimals: 18,
   },
   '0x72': {
     chainName: 'Coston2',
@@ -92,8 +92,8 @@ const networks = {
     rpcUrl: 'https://coston2-api.flare.network/ext/C/rpc',
     blockExplorerUrl: 'https://coston2-explorer.flare.network',
     enabled: false,
-    poroTokenAddress: '0x469dd82993185fb3274c1A53E517ff29454f8a6e', // Replace with your PORO token address on Coston2
-    poroTokenDecimals: 18,
+    pyroTokenAddress: '0x469dd82993185fb3274c1A53E517ff29454f8a6e', // Replace with your PYRO token address on Coston2
+    pyroTokenDecimals: 18,
   },
   '0x1': {
     chainName: 'Ethereum',
@@ -104,8 +104,8 @@ const networks = {
     rpcUrl: 'https://ethereum-rpc.publicnode.com',
     blockExplorerUrl: 'https://etherscan.io',
     enabled: false,
-    poroTokenAddress: '',
-    poroTokenDecimals: 18,
+    pyroTokenAddress: '',
+    pyroTokenDecimals: 18,
   },
   '0xa86a': {
     chainName: 'Avalanche',
@@ -116,8 +116,8 @@ const networks = {
     rpcUrl: 'https://api.avax.network/ext/bc/C/rpc',
     blockExplorerUrl: 'https://snowtrace.io',
     enabled: false,
-    poroTokenAddress: '',
-    poroTokenDecimals: 18,
+    pyroTokenAddress: '',
+    pyroTokenDecimals: 18,
   },
 };
 
@@ -132,7 +132,7 @@ const contractABI = [
   },
   {
     inputs: [],
-    name: 'makePaymentInPORO',
+    name: 'makePaymentInPYRO',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
@@ -222,7 +222,7 @@ app.post('/api/request-prediction', async (req, res) => {
   }
 
   // Validate paymentMethod
-  if (!['FLR', 'PORO'].includes(paymentMethod)) {
+  if (!['FLR', 'PYRO'].includes(paymentMethod)) {
     return res.status(400).json({ error: 'Invalid payment method' });
   }
 
@@ -248,8 +248,8 @@ app.post('/api/request-prediction', async (req, res) => {
       network.paymentAmount,
       network.decimals,
       paymentMethod,
-      network.poroTokenAddress,
-      network.poroTokenDecimals
+      network.pyroTokenAddress,
+      network.pyroTokenDecimals
     );
 
     if (!isValid) {
@@ -278,8 +278,8 @@ async function verifyTransaction(
   expectedAmount,
   decimals,
   paymentMethod,
-  poroTokenAddress,
-  poroTokenDecimals
+  pyroTokenAddress,
+  pyroTokenDecimals
 ) {
   try {
     const tx = await provider.getTransaction(transactionHash);
@@ -325,8 +325,8 @@ async function verifyTransaction(
         console.error('Transaction is not a call to makePaymentInFLR');
         return false;
       }
-    } else if (paymentMethod === 'PORO') {
-      // Check if the transaction is a contract interaction with makePaymentInPORO
+    } else if (paymentMethod === 'PYRO') {
+      // Check if the transaction is a contract interaction with makePaymentInPYRO
       if (tx.to.toLowerCase() !== contractAddress.toLowerCase()) {
         console.error(`Transaction was sent to ${tx.to}, expected ${contractAddress}`);
         return false;
@@ -336,15 +336,15 @@ async function verifyTransaction(
       const iface = new ethers.utils.Interface(contractABI);
       const decodedData = iface.parseTransaction({ data: tx.data });
 
-      if (decodedData.name !== 'makePaymentInPORO') {
-        console.error('Transaction is not a call to makePaymentInPORO');
+      if (decodedData.name !== 'makePaymentInPYRO') {
+        console.error('Transaction is not a call to makePaymentInPYRO');
         return false;
       }
 
-      // Optionally, verify that the PORO tokens were transferred to the contract
+      // Optionally, verify that the PYRO tokens were transferred to the contract
       // This can be complex and may require additional logic, such as checking the events
-      // emitted by the PORO token contract. For simplicity, we're assuming the transaction
-      // is valid if it successfully calls makePaymentInPORO.
+      // emitted by the PYRO token contract. For simplicity, we're assuming the transaction
+      // is valid if it successfully calls makePaymentInPYRO.
     }
 
     console.log('Transaction verified successfully');
